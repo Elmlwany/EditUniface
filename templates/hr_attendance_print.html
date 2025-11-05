@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance - {{ employee }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    @media print {
+      .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background:#fff; color:#111; margin:10mm; font-size:12px; }
+    .header { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #f2c9a6; padding-bottom:6px; margin-bottom:10px; }
+    .header h1 { margin:0; font-size:20px; letter-spacing:0.2px; color:#333; }
+    .grid { display:grid; grid-template-columns: 220px 220px 240px; gap:8px; align-items:start; }
+    .box { border:1px solid #ddd; border-radius:6px; padding:8px; }
+    .box.compact { padding:6px; border-color:#eee; }
+    .box h3 { margin:0 0 6px; font-size:13px; color:#333; }
+    table.mini { width:100%; border-collapse:collapse; font-size:11px; }
+    table.mini td { border-bottom:1px solid #eee; padding:3px 4px; }
+    .ytd { margin-top:8px; }
+    .side { display:flex; gap:10px; align-items:flex-start; }
+    .overtime table { width:100%; border-collapse:collapse; font-size:11px; }
+    .overtime th, .overtime td { border:1px solid #ddd; padding:3px 4px; text-align:right; }
+    .overtime th:first-child, .overtime td:first-child { text-align:center; }
+    .avatar { width:54px; height:54px; border-radius:50%; background:#eee; display:inline-block; }
+    .footer { margin-top:10px; }
+    table.detail { width:100%; border-collapse:collapse; font-size:10px; }
+    table.detail th, table.detail td { border:1px solid #ddd; padding:3px 4px; line-height:1.2; }
+    .controls { margin-bottom:6px; }
+    .charts { display:grid; grid-template-columns: 1fr; gap:8px; }
+    /* Smaller charts for single-page print */
+    .chart-canvas { width: 160px; height: 80px; }
+  </style>
+</head>
+<body>
+  <div class="controls no-print">
+    <button onclick="window.print()">Print</button>
+    <a href="{{ url_for('hr_dashboard') }}">Back</a>
+  </div>
+  <div class="header">
+    <h1>AI HR Attendance System</h1>
+    <img src="{{ url_for('static', filename='logo6.png') }}" alt="logo" style="height:48px">
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="box">
+        <h3>Monthly</h3>
+        <table class="mini">
+          <tr><td>Working Days</td><td style="text-align:right">{{ monthly.working_days }}</td></tr>
+          <tr><td>Present</td><td style="text-align:right">{{ monthly.present }}</td></tr>
+          <tr><td>Absent</td><td style="text-align:right">{{ monthly.absent }}</td></tr>
+          <tr><td>Vacation</td><td style="text-align:right">{{ monthly.vacation }}</td></tr>
+          <tr><td>Sick</td><td style="text-align:right">{{ monthly.sick }}</td></tr>
+          <tr><td>Official Leave</td><td style="text-align:right">{{ monthly.official_leave }}</td></tr>
+          <tr><td>Late Days</td><td style="text-align:right">{{ monthly.late_days }}</td></tr>
+          <tr><td>Overtime Hours</td><td style="text-align:right">{{ '%.3f' % monthly.overtime_hours }}</td></tr>
+          <tr><td>Attendance %</td><td style="text-align:right">{{ monthly.attendance_percent }}</td></tr>
+        </table>
+      </div>
+      <div class="box ytd">
+        <h3>Year To Date</h3>
+        <table class="mini">
+          <tr><td>Working Days</td><td style="text-align:right">{{ ytd.working_days }}</td></tr>
+          <tr><td>Present</td><td style="text-align:right">{{ ytd.present }}</td></tr>
+          <tr><td>Absent</td><td style="text-align:right">{{ ytd.absent }}</td></tr>
+          <tr><td>Vacation</td><td style="text-align:right">{{ ytd.vacation }}</td></tr>
+          <tr><td>Sick</td><td style="text-align:right">{{ ytd.sick }}</td></tr>
+          <tr><td>Official Leave</td><td style="text-align:right">{{ ytd.official_leave }}</td></tr>
+          <tr><td>Late Days</td><td style="text-align:right">{{ ytd.late_days }}</td></tr>
+          <tr><td>Overtime Hours</td><td style="text-align:right">{{ '%.3f' % ytd.overtime_hours }}</td></tr>
+          <tr><td>Attendance %</td><td style="text-align:right">{{ ytd.attendance_percent }}</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="charts">
+      <div class="box compact">
+        <h3 style="margin-bottom:6px">Monthly Attendance</h3>
+        <canvas id="monthlyChart" class="chart-canvas" width="160" height="80"></canvas>
+      </div>
+      <div class="box compact">
+        <h3 style="margin-bottom:6px">YTD Attendance</h3>
+        <canvas id="ytdChart" class="chart-canvas" width="160" height="80"></canvas>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="box" style="flex:1">
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          <span class="avatar"></span>
+          <div>
+            <div><strong>Name</strong>: {{ employee }}</div>
+            <div><strong>Title</strong>: Employee</div>
+            <div><strong>Joining Date</strong>: 2024-01-01</div>
+            <div><strong>Annual Leave Days</strong>: 21</div>
+            <div><strong>Balance</strong>: 14</div>
+          </div>
+        </div>
+      </div>
+      <div class="box overtime" style="width:320px">
+        <h3>Overtime Hours by Month (YTD)</h3>
+        <table>
+          <thead><tr><th>Month</th><th>Hours</th></tr></thead>
+          <tbody>
+            {% for m,h in overtime_by_month.items() %}
+            <tr><td>{{ m }}</td><td>{{ '%.2f' % h }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="box">
+      <h3>Details</h3>
+      <div class="table-responsive">
+        <table class="detail">
+          <thead>
+            <tr>
+              <th>Date</th><th>Day</th><th>Time In</th><th>Time Out</th><th>Total Hours</th><th>Status</th><th>Is Late?</th><th>Overtime Hours</th><th>Visits</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in daily_rows %}
+            <tr>
+              <td>{{ r.date }}</td>
+              <td>{{ r.day }}</td>
+              <td>{{ r.time_in }}</td>
+              <td>{{ r.time_out }}</td>
+              <td style="text-align:right">{{ '%.2f' % r.total }}</td>
+              <td>{{ r.status }}</td>
+              <td>{{ r.late }}</td>
+              <td style="text-align:right">{{ '%.2f' % r.ot }}</td>
+              <td style="text-align:right">{{ '%.2f' % r.visits }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const monthly = {{ monthly | tojson }};
+    const ytd = {{ ytd | tojson }};
+    function renderDonut(id, stats){
+      const ctx = document.getElementById(id).getContext('2d');
+      const values = [stats.present, stats.absent, stats.vacation, stats.sick, stats.official_leave];
+      const labels = ['Present','Absent','Vacation','Sick','Official Leave'];
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets:[{ data: values, backgroundColor: ['#4e79a7','#e15759','#f28e2b','#76b7b2','#59a14f'] }] },
+        options: { responsive:false, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, cutout: '72%', layout:{ padding:0 } }
+      });
+    }
+    renderDonut('monthlyChart', monthly);
+    renderDonut('ytdChart', ytd);
+    // Auto print when loaded
+    window.addEventListener('load', () => { setTimeout(()=>window.print(), 300); });
+  </script>
+</body>
+</html>
+
+
